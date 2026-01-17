@@ -9,6 +9,7 @@ export DEBIAN_FRONTEND=noninteractive
 apt-get update
 apt-get --yes install --no-install-recommends \
     less \
+    xz-utils \
     ca-certificates \
     curl \
     php \
@@ -28,6 +29,34 @@ apt-get clean
 rm -rf /var/lib/apt/lists/*
 EOF
 
+ARG S6_OVERLAY_VERSION=v3.2.1.0
+
+RUN <<EOF
+set -euo pipefail
+
+tmp_dir=$(mktemp -d)
+
+curl \
+    --location \
+    --silent \
+    --output "${tmp_dir}/s6-overlay-x86_64.tar.xz" \
+    "https://github.com/just-containers/s6-overlay/releases/download/${S6_OVERLAY_VERSION}/s6-overlay-x86_64.tar.xz"
+
+tar -C / -Jxpf "${tmp_dir}/s6-overlay-x86_64.tar.xz"
+
+curl \
+    --location \
+    --silent \
+    --output "${tmp_dir}/s6-overlay-noarch.tar.xz" \
+    "https://github.com/just-containers/s6-overlay/releases/download/${S6_OVERLAY_VERSION}/s6-overlay-noarch.tar.xz"
+
+tar -C / -Jxpf "${tmp_dir}/s6-overlay-noarch.tar.xz"
+
+rm -rf "${tmp_dir}"
+EOF
+
+ENTRYPOINT [ "/init" ]
+
 FROM install AS db
 
 RUN <<EOF
@@ -39,12 +68,9 @@ chmod 777 /run/mysqld
 EOF
 
 COPY ./db/mariadb.cnf /etc/mysql/mariadb.conf.d/99-bind.cnf
-
-USER mysql
+COPY ./db/rootfs/ /
 
 EXPOSE 3306
-
-ENTRYPOINT [ "mariadbd" ]
 
 FROM install AS app
 
@@ -112,7 +138,6 @@ EOF
 
 COPY --chown=www-data ./app/apache-vhost.conf /etc/apache2/sites-available/000-default.conf
 RUN a2ensite 000-default.conf
+COPY ./app/rootfs/ /
 
 EXPOSE 80
-
-ENTRYPOINT [ "/usr/sbin/apachectl", "-D", "FOREGROUND" ]

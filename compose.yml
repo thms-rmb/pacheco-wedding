@@ -1,0 +1,35 @@
+services:
+  app:
+    build:
+      context: ./docker-files
+      target: app
+      args:
+        WORDPRESS_VERSION: "6.9"
+        WP_CLI_VERSION: "2.12.0"
+    volumes:
+      - ./wp-files/wp-config.php:/var/www/html/wp-config.php
+      - ./wp-files/wp-content:/var/www/html/wp-content
+    ports:
+      - "8080:80"
+    secrets:
+      - db_name
+      - db_user
+      - db_password
+  db:
+    build:
+      context: ./docker-files
+      target: db
+    secrets:
+      - db_name
+      - db_user
+      - db_password
+    environment:
+      DB_USER_HOST: "%.${COMPOSE_PROJECT_NAME}_default"
+
+secrets:
+  db_name:
+    environment: DB_NAME
+  db_user:
+    environment: DB_USER
+  db_password:
+    environment: DB_PASSWORD

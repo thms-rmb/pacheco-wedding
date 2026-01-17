@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+
+# Helper to run wp-cli in the wordpress docker container
+
+set -euo pipefail
+
+DOCKER_CMD="${DOCKER_CMD:-sudo-docker}"
+
+$DOCKER_CMD compose exec --user=www-data --workdir=/var/www/html app wp-cli "$@"

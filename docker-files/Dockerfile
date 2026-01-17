@@ -55,6 +55,8 @@ tar -C / -Jxpf "${tmp_dir}/s6-overlay-noarch.tar.xz"
 rm -rf "${tmp_dir}"
 EOF
 
+COPY ./rootfs/ /
+
 ENTRYPOINT [ "/init" ]
 
 FROM install AS db

@@ -1,0 +1,4 @@
+#!/bin/bash
+
+# Exit the container if MariaDB exits
+kill -TERM 1

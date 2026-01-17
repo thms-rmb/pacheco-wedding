@@ -1,0 +1,4 @@
+#!/bin/bash
+
+# Exit the container if Apache exits
+kill -TERM 1

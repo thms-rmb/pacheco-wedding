@@ -1,0 +1,4 @@
+#!/bin/bash
+
+# Exit the container if PHP FPM exits
+kill -TERM 1

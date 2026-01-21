@@ -21,7 +21,7 @@ apt-get --yes install --no-install-recommends \
     php-mysql \
     php-xml \
     apache2 \
-    libapache2-mod-php \
+    php-fpm \
     mariadb-client \
     mariadb-server
 
@@ -139,7 +139,16 @@ rm -rf "${tmp_dir}"
 EOF
 
 COPY --chown=www-data ./app/apache-vhost.conf /etc/apache2/sites-available/000-default.conf
-RUN a2ensite 000-default.conf
+RUN <<EOF
+set -euo pipefail
+
+a2ensite 000-default.conf
+a2enmod proxy_fcgi setenvif
+a2dismod php8.4 mpm_prefork
+a2enmod mpm_event
+a2enconf php8.4-fpm
+EOF
+
 COPY ./app/rootfs/ /
 
 EXPOSE 80

@@ -1,0 +1,4 @@
+#!/command/execlineb
+
+s6-envuidgid www-data
+/usr/sbin/php-fpm8.4 --nodaemonize

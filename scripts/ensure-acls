@@ -3,16 +3,38 @@
 set -euo pipefail
 set -x
 
-current_user=$(who am i | awk '{print $1}')
+current_user="${SUDO_USER:-${LOGNAME:-${USER:-}}}"
 current_uid=$(id -u "$current_user")
 current_gid=$(id -g "$current_user")
 
-# Remove all ACLs
-find wp-files | xargs setfacl --remove-all
+# Detect OS
+OS_TYPE=$(uname -s)
 
-# Updates ownership to www-data
-chown -R 33:33 wp-files
+if [[ "$OS_TYPE" == "Linux" ]]; then
+    # Linux: Use setfacl for ACLs
+    # Remove all ACLs
+    find wp-files -exec setfacl --remove-all {} \;
 
-# Allow user and group full access
-setfacl -d -m u:"$current_uid":rwx -m g:"$current_gid":rwx wp-files
-find wp-files | xargs setfacl -m u:"$current_uid":rwx -m g:"$current_gid":rwx
+    # Update ownership to www-data
+    chown -R 33:33 wp-files
+
+    # Allow user and group full access
+    setfacl -d -m u:"$current_uid":rwx -m g:"$current_gid":rwx wp-files
+    find wp-files -exec setfacl -m u:"$current_uid":rwx -m g:"$current_gid":rwx {} \;
+
+elif [[ "$OS_TYPE" == "Darwin" ]]; then
+    # macOS: Use chmod with ACL support
+    # Remove all ACLs
+    find wp-files -exec chmod -a - {} \;
+
+    # Update ownership to www-data
+    chown -R 33:33 wp-files
+
+    # Allow user and group full access
+    chmod +a "user:${current_user} allow list,add_file,search,add_subdirectory,delete_child,readattr,writeattr,file_inherit,directory_inherit" wp-files
+    find wp-files -type f -exec chmod +a "user:${current_user} allow read,write,execute" {} \;
+
+else
+    echo "Unsupported OS: $OS_TYPE"
+    exit 1
+fi

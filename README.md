@@ -19,7 +19,7 @@ WordPress site for our wedding!
 3. (If initially creating the db) run the script to create a new user with all privileges:
 
     ```shell
-    docker compose exec --no-tty db php < scripts/createuser.php
+    docker compose exec --no-tty --user=mysql db php < scripts/createuser.php
     ```
 
 4. (If initially creating the db) run the `wp-cli` command to create the database:

@@ -3,18 +3,16 @@
 set -euo pipefail
 set -x
 
+current_user=$(who am i | awk '{print $1}')
+current_uid=$(id -u "$current_user")
+current_gid=$(id -g "$current_user")
+
 # Remove all ACLs
 find wp-files | xargs setfacl --remove-all
 
-# Lets www-data read, write and navigate uploads directory
-setfacl -d -m u:33:rwx -m g:33:rwx wp-files/wp-content/uploads
-find wp-files/wp-content/uploads | xargs setfacl -m u:33:rwx -m g:33:rwx
+# Updates ownership to www-data
+chown -R 33:33 wp-files
 
-# Lets www-data read and navigate themes and plugins directories
-setfacl -d -m u:33:r-x -m g:33:r-x wp-files/wp-content
-find wp-files/wp-content \
-    -not -path 'wp-files/wp-content/uploads/*' \
-    -and -not -path 'wp-files/wp-content/uploads' | xargs setfacl -m u:33:r-x -m g:33:r-x
-
-# Lets www-data read wp-config.php
-setfacl -m u:33:r-- -m g:33:r-- wp-files/wp-config.php
+# Allow user and group full access
+setfacl -d -m u:"$current_uid":rwx -m g:"$current_gid":rwx wp-files
+find wp-files | xargs setfacl -m u:"$current_uid":rwx -m g:"$current_gid":rwx

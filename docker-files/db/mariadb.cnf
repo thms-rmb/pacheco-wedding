@@ -1,3 +1,0 @@
-# Override default bind-address to allow connections from other containers
-[mysqld]
-bind-address = 0.0.0.0

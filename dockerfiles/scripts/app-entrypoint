@@ -1,0 +1,69 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+read_secret() {
+    local name="$1"
+    local path="/run/secrets/${name}"
+
+    if [[ ! -r "${path}" ]]; then
+        echo "Required secret ${name} is missing or unreadable at ${path}." >&2
+        return 1
+    fi
+
+    printf "%s" "$(< "${path}")"
+}
+
+wait_for_database() {
+    local db_name db_user db_password attempt
+
+    db_name="$(read_secret db_name)"
+    db_user="$(read_secret db_user)"
+    db_password="$(read_secret db_password)"
+
+    echo "Waiting for MySQL service db to accept connections"
+
+    for attempt in {1..60}; do
+        if MYSQL_PWD="${db_password}" mysql \
+            --batch \
+            --connect-timeout=2 \
+            --database="${db_name}" \
+            --host=db \
+            --silent \
+            --user="${db_user}" \
+            --execute="SELECT 1" >/dev/null 2>&1; then
+            echo "MySQL service db is ready"
+            return 0
+        fi
+
+        sleep 1
+    done
+
+    echo "Timed out waiting for MySQL service db." >&2
+    return 1
+}
+
+run_database_migrations() {
+    if ! gosu www-data php /usr/local/bin/wp core is-installed --path=/var/www/html >/dev/null 2>&1; then
+        echo "WordPress is not installed yet; skipping database migrations"
+        return 0
+    fi
+
+    echo "Running WordPress database migrations"
+    gosu www-data php /usr/local/bin/wp core update-db --path=/var/www/html
+}
+
+wait_for_database
+run_database_migrations
+
+set +u
+. /etc/apache2/envvars
+set -u
+
+ln -sfT /dev/stderr /var/log/apache2/error.log
+ln -sfT /dev/stdout /var/log/apache2/access.log
+ln -sfT /dev/stdout /var/log/apache2/other_vhosts_access.log
+
+trap 'rm -f /var/log/apache2/error.log /var/log/apache2/access.log /var/log/apache2/other_vhosts_access.log' EXIT
+
+exec apache2 -D FOREGROUND

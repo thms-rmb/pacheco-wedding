@@ -1,0 +1,150 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+DATADIR="/var/lib/mysql"
+RUNDIR="/var/run/mysqld"
+SOCKET="${RUNDIR}/mysqld.sock"
+
+mysql_socket=(mysql --protocol=socket --socket="${SOCKET}" --user=root)
+mysqladmin_socket=(mysqladmin --protocol=socket --socket="${SOCKET}" --user=root)
+
+want_help() {
+    local arg
+
+    for arg; do
+        case "${arg}" in
+            -\? | --help | --print-defaults | -V | --version)
+                return 0
+                ;;
+        esac
+    done
+
+    return 1
+}
+
+sql_escape_literal() {
+    local value="$1"
+
+    value="${value//\\/\\\\}"
+    value="${value//\'/\'\'}"
+    printf "%s" "${value}"
+}
+
+sql_escape_identifier() {
+    local value="$1"
+
+    value="${value//\`/\`\`}"
+    printf '`%s`' "${value}"
+}
+
+read_secret() {
+    local name="$1"
+    local path="/run/secrets/${name}"
+
+    if [[ ! -r "${path}" ]]; then
+        echo "Required secret ${name} is missing or unreadable at ${path}." >&2
+        return 1
+    fi
+
+    printf "%s" "$(< "${path}")"
+}
+
+read_secrets() {
+    DB_NAME="$(read_secret db_name)"
+    DB_USER="$(read_secret db_user)"
+    DB_PASSWORD="$(read_secret db_password)"
+
+    export DB_NAME DB_USER DB_PASSWORD
+}
+
+ensure_runtime_directories() {
+    mkdir -p "${RUNDIR}"
+    chown mysql:mysql "${RUNDIR}"
+}
+
+initialize_database_directory() {
+    if [[ -d "${DATADIR}/mysql" ]]; then
+        chown mysql:mysql "${DATADIR}" "${RUNDIR}"
+        return 0
+    fi
+
+    echo "Initializing MySQL data directory at ${DATADIR}"
+    mkdir -p "${DATADIR}"
+    chown -R mysql:mysql "${DATADIR}"
+    gosu mysql mysqld --initialize-insecure --datadir="${DATADIR}"
+}
+
+start_temporary_server() {
+    echo "Starting temporary MySQL server for setup"
+    gosu mysql mysqld \
+        --skip-networking \
+        --socket="${SOCKET}" \
+        --datadir="${DATADIR}" \
+        "$@" &
+    TEMP_SERVER_PID="$!"
+
+    local i
+    for i in {30..0}; do
+        if "${mysql_socket[@]}" --execute="SELECT 1" >/dev/null 2>&1; then
+            return 0
+        fi
+
+        sleep 1
+    done
+
+    echo "Unable to start temporary MySQL server." >&2
+    return 1
+}
+
+stop_temporary_server() {
+    if [[ -S "${SOCKET}" ]]; then
+        "${mysqladmin_socket[@]}" shutdown >/dev/null 2>&1 || true
+    fi
+
+    if [[ -n "${TEMP_SERVER_PID:-}" ]]; then
+        wait "${TEMP_SERVER_PID}" >/dev/null 2>&1 || true
+        unset TEMP_SERVER_PID
+    fi
+}
+
+ensure_application_database() {
+    : "${DB_NAME:?DB_NAME is required}"
+    : "${DB_USER:?DB_USER is required}"
+    : "${DB_PASSWORD:?DB_PASSWORD is required}"
+
+    local db_name db_user db_pass
+
+    db_name="$(sql_escape_identifier "${DB_NAME}")"
+    db_user="$(sql_escape_literal "${DB_USER}")"
+    db_pass="$(sql_escape_literal "${DB_PASSWORD}")"
+
+    "${mysql_socket[@]}" <<EOSQL
+CREATE DATABASE IF NOT EXISTS ${db_name};
+CREATE USER IF NOT EXISTS '${db_user}'@'%' IDENTIFIED BY '${db_pass}';
+GRANT ALL PRIVILEGES ON ${db_name}.* TO '${db_user}'@'%';
+FLUSH PRIVILEGES;
+EOSQL
+}
+
+if [[ "${1:-}" == -* ]]; then
+    set -- mysqld "$@"
+fi
+
+if [[ "${1:-}" = "mysqld" ]] && ! want_help "$@"; then
+    read_secrets
+    ensure_runtime_directories
+    initialize_database_directory
+    start_temporary_server "${@:2}"
+    trap stop_temporary_server EXIT
+
+    ensure_application_database
+
+    stop_temporary_server
+    trap - EXIT
+
+    echo "MySQL setup complete; starting server"
+    exec gosu mysql "$@"
+fi
+
+exec "$@"

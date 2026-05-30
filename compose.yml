@@ -1,10 +1,11 @@
 services:
   app:
+    platform: linux/amd64
     build:
-      context: ./docker-files
+      context: ./dockerfiles
       target: app
       args:
-        WORDPRESS_VERSION: "6.9"
+        WORDPRESS_VERSION: "7.0"
         WP_CLI_VERSION: "2.12.0"
     volumes:
       - ./wp-files/wp-config.php:/var/www/html/wp-config.php
@@ -16,15 +17,14 @@ services:
       - db_user
       - db_password
   db:
+    platform: linux/amd64
     build:
-      context: ./docker-files
+      context: ./dockerfiles
       target: db
     secrets:
       - db_name
       - db_user
       - db_password
-    environment:
-      DB_USER_HOST: "%.${COMPOSE_PROJECT_NAME}_default"
 
 secrets:
   db_name:

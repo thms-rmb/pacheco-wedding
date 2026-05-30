@@ -16,6 +16,7 @@ dbdump.sql
 !/wp-files/wp-content/themes/index.php
 /wp-files/wp-content/plugins/*
 !/wp-files/wp-content/plugins/index.php
+/wp-files/wp-content/languages/*
 
 # Node modules and package manager files
 node_modules/

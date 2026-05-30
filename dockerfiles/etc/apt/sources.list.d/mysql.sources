@@ -1,0 +1,23 @@
+Types: deb
+URIs: http://repo.mysql.com/apt/debian
+Suites: trixie
+Components: mysql-apt-config
+Signed-By: /usr/share/keyrings/mysql-apt-config.asc
+
+Types: deb
+URIs: http://repo.mysql.com/apt/debian
+Suites: trixie
+Components: mysql-8.4-lts
+Signed-By: /usr/share/keyrings/mysql-apt-config.asc
+
+Types: deb
+URIs: http://repo.mysql.com/apt/debian
+Suites: trixie
+Components: mysql-tools
+Signed-By: /usr/share/keyrings/mysql-apt-config.asc
+
+Types: deb-src
+URIs: http://repo.mysql.com/apt/debian
+Suites: trixie
+Components: mysql-8.4-lts
+Signed-By: /usr/share/keyrings/mysql-apt-config.asc

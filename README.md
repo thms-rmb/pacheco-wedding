@@ -10,22 +10,16 @@ WordPress site for our wedding!
     source .env
     ```
 
-2. Bring up the services:
+2. Optionally bring down the existing services if starting from scratch:
 
     ```shell
-    docker compose --progress=plain up --build --detach
+    docker compose down --volumes
     ```
 
-3. (If initially creating the db) run the script to create a new user with all privileges:
+3. Bring up the services:
 
     ```shell
-    docker compose exec --no-tty --user=mysql db php < scripts/createuser.php
-    ```
-
-4. (If initially creating the db) run the `wp-cli` command to create the database:
-
-    ```shell
-    scripts/wp-cli db create
+    docker compose --progress plain up --detach --build --pull always
     ```
 
 ### Docker Permissions
